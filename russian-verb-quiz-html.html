@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Russian Verbs of Motion Quiz</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        .quiz-container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            text-align: center;
+            width: 600px;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        #question, #feedback, #score {
+            font-size: 18px;
+            margin: 20px 0;
+        }
+        input[type="text"], button {
+            font-size: 16px;
+            padding: 5px;
+            margin: 5px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            padding: 5px 10px;
+        }
+        .correct { color: green; }
+        .incorrect { color: red; }
+        #addVerbForm { margin-top: 20px; }
+        #addVerbForm input[type="text"] { width: 80%; }
+        #verbList { 
+            margin-top: 20px; 
+            text-align: left; 
+            height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+        }
+        #verbList label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .delete-btn {
+            background-color: #f44336;
+            color: white;
+            border: none;
+            padding: 2px 5px;
+            margin-left: 5px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="quiz-container">
+        <h1>Russian Verbs of Motion Quiz</h1>
+        <div id="question"></div>
+        <input type="text" id="answer" placeholder="Your answer">
+        <button id="submit">Submit</button>
+        <div id="feedback"></div>
+        <div id="score">Score: 0/0</div>
+        
+        <h2>Add New Verb</h2>
+        <form id="addVerbForm">
+            <input type="text" id="newVerbInfinitive" placeholder="Infinitive (e.g., ходить)" required>
+            <input type="text" id="newVerbя" placeholder="я" required>
+            <input type="text" id="newVerbты" placeholder="ты" required>
+            <input type="text" id="newVerbон" placeholder="он/она/оно" required>
+            <input type="text" id="newVerbмы" placeholder="мы" required>
+            <input type="text" id="newVerbвы" placeholder="вы" required>
+            <input type="text" id="newVerbони" placeholder="они" required>
+            <button type="submit">Add Verb</button>
+        </form>
+        
+        <h2>Select Verbs for Quiz</h2>
+        <div id="verbList"></div>
+        
+        <button id="startQuiz">Start Quiz</button>
+    </div>
+
+    <script>
+        let verbsOfMotion = {
+            "идти (to go on foot, unidirectional)": {
+                "я": "иду", "ты": "идёшь", "он/она/оно": "идёт",
+                "мы": "идём", "вы": "идёте", "они": "идут"
+            },
+            "ходить (to go on foot, multidirectional)": {
+                "я": "хожу", "ты": "ходишь", "он/она/оно": "ходит",
+                "мы": "ходим", "вы": "ходите", "они": "ходят"
+            },
+            "ехать (to go by vehicle, unidirectional)": {
+                "я": "еду", "ты": "едешь", "он/она/оно": "едет",
+                "мы": "едем", "вы": "едете", "они": "едут"
+            },
+            "ездить (to go by vehicle, multidirectional)": {
+                "я": "езжу", "ты": "ездишь", "он/она/оно": "ездит",
+                "мы": "ездим", "вы": "ездите", "они": "ездят"
+            },
+            "лететь (to fly, unidirectional)": {
+                "я": "лечу", "ты": "летишь", "он/она/оно": "летит",
+                "мы": "летим", "вы": "летите", "они": "летят"
+            },
+            "летать (to fly, multidirectional)": {
+                "я": "летаю", "ты": "летаешь", "он/она/оно": "летает",
+                "мы": "летаем", "вы": "летаете", "они": "летают"
+            },
+            "плыть (to swim, unidirectional)": {
+                "я": "плыву", "ты": "плывёшь", "он/она/оно": "плывёт",
+                "мы": "плывём", "вы": "плывёте", "они": "плывут"
+            },
+            "плавать (to swim, multidirectional)": {
+                "я": "плаваю", "ты": "плаваешь", "он/она/оно": "плавает",
+                "мы": "плаваем", "вы": "плаваете", "они": "плавают"
+            }
+        };
+
+        const defaultVerbs = Object.keys(verbsOfMotion);
+
+        let score = 0;
+        let currentQuestion = 0;
+        const totalQuestions = 10;
+        let currentVerb, currentSubject, correctAnswer;
+        let selectedVerbs = [];
+
+        function loadCustomVerbs() {
+            const savedVerbs = localStorage.getItem('customVerbs');
+            if (savedVerbs) {
+                const customVerbs = JSON.parse(savedVerbs);
+                verbsOfMotion = { ...verbsOfMotion, ...customVerbs };
+            }
+        }
+
+        function saveCustomVerbs() {
+            const customVerbs = {};
+            Object.keys(verbsOfMotion).forEach(verb => {
+                if (!defaultVerbs.includes(verb)) {
+                    customVerbs[verb] = verbsOfMotion[verb];
+                }
+            });
+            localStorage.setItem('customVerbs', JSON.stringify(customVerbs));
+        }
+
+        function updateVerbList() {
+            const listElement = document.getElementById('verbList');
+            listElement.innerHTML = '';
+            Object.keys(verbsOfMotion).forEach(verb => {
+                const label = document.createElement('label');
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.value = verb;
+                checkbox.checked = true;
+                label.appendChild(checkbox);
+                label.appendChild(document.createTextNode(verb));
+                
+                if (!defaultVerbs.includes(verb)) {
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.textContent = 'Delete';
+                    deleteBtn.className = 'delete-btn';
+                    deleteBtn.onclick = function(e) {
+                        e.preventDefault();
+                        deleteVerb(verb);
+                    };
+                    label.appendChild(deleteBtn);
+                }
+                
+                listElement.appendChild(label);
+            });
+        }
+
+        function deleteVerb(verb) {
+            if (confirm(`Are you sure you want to delete the verb "${verb}"?`)) {
+                delete verbsOfMotion[verb];
+                saveCustomVerbs();
+                updateVerbList();
+            }
+        }
+
+        function startQuiz() {
+            selectedVerbs = Array.from(document.querySelectorAll('#verbList input:checked')).map(cb => cb.value);
+            if (selectedVerbs.length === 0) {
+                alert("Please select at least one verb for the quiz.");
+                return;
+            }
+            score = 0;
+            currentQuestion = 0;
+            nextQuestion();
+            document.getElementById('startQuiz').style.display = 'none';
+            document.getElementById('submit').style.display = 'inline';
+            document.getElementById('answer').style.display = 'inline';
+        }
+
+        function nextQuestion() {
+            if (currentQuestion < totalQuestions) {
+                currentVerb = selectedVerbs[Math.floor(Math.random() * selectedVerbs.length)];
+                const subjects = Object.keys(verbsOfMotion[currentVerb]);
+                currentSubject = subjects[Math.floor(Math.random() * subjects.length)];
+                correctAnswer = verbsOfMotion[currentVerb][currentSubject];
+
+                document.getElementById('question').textContent = `Conjugate the verb '${currentVerb}' for '${currentSubject}'`;
+                document.getElementById('answer').value = '';
+                document.getElementById('feedback').textContent = '';
+                currentQuestion++;
+            } else {
+                showFinalScore();
+            }
+        }
+
+        function checkAnswer() {
+            const userAnswer = document.getElementById('answer').value.trim().toLowerCase();
+            const feedbackElement = document.getElementById('feedback');
+            
+            if (userAnswer === correctAnswer) {
+                score++;
+                feedbackElement.textContent = 'Correct!';
+                feedbackElement.className = 'correct';
+            } else {
+                feedbackElement.textContent = `Incorrect. The correct answer is: ${correctAnswer}`;
+                feedbackElement.className = 'incorrect';
+            }
+            
+            updateScore();
+            setTimeout(nextQuestion, 2000);
+        }
+
+        function updateScore() {
+            document.getElementById('score').textContent = `Score: ${score}/${currentQuestion}`;
+        }
+
+        function showFinalScore() {
+            document.getElementById('question').textContent = `Quiz complete! Your final score: ${score}/${totalQuestions}`;
+            document.getElementById('answer').style.display = 'none';
+            document.getElementById('submit').style.display = 'none';
+            document.getElementById('feedback').textContent = '';
+            document.getElementById('startQuiz').style.display = 'inline';
+            document.getElementById('startQuiz').textContent = 'Restart Quiz';
+        }
+
+        function addNewVerb(event) {
+            event.preventDefault();
+            const infinitive = document.getElementById('newVerbInfinitive').value;
+            const conjugations = {
+                "я": document.getElementById('newVerbя').value,
+                "ты": document.getElementById('newVerbты').value,
+                "он/она/оно": document.getElementById('newVerbон').value,
+                "мы": document.getElementById('newVerbмы').value,
+                "вы": document.getElementById('newVerbвы').value,
+                "они": document.getElementById('newVerbони').value
+            };
+            
+            verbsOfMotion[infinitive] = conjugations;
+            saveCustomVerbs();
+            updateVerbList();
+            event.target.reset();
+        }
+
+        document.getElementById('submit').addEventListener('click', checkAnswer);
+        document.getElementById('answer').addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                checkAnswer();
+            }
+        });
+        document.getElementById('addVerbForm').addEventListener('submit', addNewVerb);
+        document.getElementById('startQuiz').addEventListener('click', startQuiz);
+
+        loadCustomVerbs();
+        updateVerbList();
+        document.getElementById('submit').style.display = 'none';
+        document.getElementById('answer').style.display = 'none';
+    </script>
+</body>
+</html>
